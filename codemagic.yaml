@@ -18,6 +18,14 @@ workflows:
         XCODE_PROJECT: "ios/CodeIslandCompanion/CodeIslandCompanion.xcodeproj"
         XCODE_SCHEME: "CodeIslandCompanion"
     scripts:
+      # The committed .xcodeproj lags behind project.yml (e.g. WatchStateStore.swift
+      # missing from the Watch widget target), so regenerate it from the source of truth.
+      - name: Regenerate Xcode project with XcodeGen
+        script: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null || brew install xcodegen
+          cd ios/CodeIslandCompanion && xcodegen generate
+
       - name: List Xcode schemes (debug aid)
         script: |
           xcodebuild -list -project "$XCODE_PROJECT" || true

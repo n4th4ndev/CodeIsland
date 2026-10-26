@@ -1,0 +1,53 @@
+# Codemagic CI config — builds an UNSIGNED iOS .ipa of the Code Island Buddy
+# (iPhone app + Live Activity widget + embedded Apple Watch app).
+#
+# Setup (once): add this repository in https://codemagic.io, pick the
+# "ios-unsigned" workflow and Start build. The .ipa is in the build artifacts.
+#
+# The IPA is UNSIGNED: sign it yourself (Sideloadly / AltStore / SideStore /
+# ESign / TrollStore) to install it on a device.
+
+workflows:
+  ios-unsigned:
+    name: iOS unsigned IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: "ios/CodeIslandCompanion/CodeIslandCompanion.xcodeproj"
+        XCODE_SCHEME: "CodeIslandCompanion"
+    scripts:
+      - name: List Xcode schemes (debug aid)
+        script: |
+          xcodebuild -list -project "$XCODE_PROJECT" || true
+
+      - name: Build unsigned archive
+        script: |
+          set -o pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$CM_BUILD_DIR/CodeIsland.xcarchive" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
+
+      - name: Package unsigned IPA
+        script: |
+          set -euo pipefail
+          APP_PATH=$(find "$CM_BUILD_DIR/CodeIsland.xcarchive/Products/Applications" -maxdepth 1 -name "*.app" | head -1)
+          echo "App bundle: $APP_PATH"
+          find "$APP_PATH" -name "*.appex" -o -name "*.app" | sed "s|$APP_PATH|  |"
+          mkdir -p "$CM_BUILD_DIR/Payload"
+          cp -R "$APP_PATH" "$CM_BUILD_DIR/Payload/"
+          cd "$CM_BUILD_DIR"
+          zip -qr CodeIsland-unsigned.ipa Payload
+          ls -lh CodeIsland-unsigned.ipa
+    artifacts:
+      - $CM_BUILD_DIR/CodeIsland-unsigned.ipa
